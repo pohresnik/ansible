@@ -1,0 +1,112 @@
+# Переадресация HTTP -> HTTPS
+server {
+    listen 8080;
+    server_name front.webcord.ru www.front.webcord.ru;
+    return 301 https://front.webcord.ru$request_uri ;
+}
+
+# Переадресация IP -> Домен
+server {
+    listen 8080;
+    server_name 10.0.16.22;
+    return 301 https://front.webcord.ru$request_uri;
+}
+
+# Переадресация WWW -> non WWW
+server {
+    listen 443 ssl http2;
+    server_name www.front.webcord.ru;
+    return 301 https://front.webcord.ru$request_uri;
+
+    add_header Strict-Transport-Security "max-age=1; includeSubDomains; preload" always;
+
+    include snippets/ssl-params.conf;
+    ssl_certificate /etc/pki/tls/certs/front.webcord.ru.crt;
+    ssl_certificate_key /etc/pki/tls/certs/front.webcord.ru.key;
+}
+
+
+server {
+    listen 443 ssl http2;
+    server_name front.webcord.ru;
+
+    set $root_path /var/www/front.webcord.ru/public;
+    set $php_sock unix:/var/run/php-fpm/php-fpm.sock;
+
+    root $root_path;
+
+    index index.php index.html;
+
+    client_max_body_size 1024M;
+    client_body_buffer_size 4M;
+
+    # kill cache
+    add_header Last-Modified $date_gmt;
+    add_header Cache-Control 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
+    if_modified_since off;
+    expires off;
+    etag off;
+
+    # включаем сжатие gzip
+    gzip on;
+    gzip_disable "msie6";
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript application/javascript;
+
+    # SSL parameters
+    include snippets/ssl-params.conf;
+    ssl_certificate /etc/pki/tls/certs/front.webcord.ru.crt;
+    ssl_certificate_key /etc/pki/tls/certs/front.webcord.ru.key;
+    
+    # log files
+    access_log /var/log/nginx/front.webcord.ru_access.log;
+    error_log /var/log/nginx/front.webcord.ru_error.log;
+
+    location = /favicon.ico {
+        log_not_found off;
+        access_log off;
+    }
+
+    location = /robots.txt {
+        allow all;
+        log_not_found off;
+        access_log off;
+    }
+
+    # запрет для загруженных скриптов
+    location ~* /(?:uploads|files)/.*\.php$ {
+        deny all;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass $php_sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        try_files $uri =404;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        expires max;
+        log_not_found off;
+    }
+
+    # ht(passwd|access)
+    location ~* /\.ht {
+        deny all;
+    }
+
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+}

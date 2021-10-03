@@ -1,0 +1,13 @@
+--- 
+# file: www.yml
+
+- hosts: www
+  roles:
+    - common
+    - iptables
+    - nginx
+    - php-fpm    
+    - memcached
+    - haproxy
+    - keepalived    
+    - postfix

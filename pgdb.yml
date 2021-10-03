@@ -1,0 +1,6 @@
+--- 
+# file: pgdb.yml
+- hosts: pgdb
+  roles:
+    - common
+    - postgresql

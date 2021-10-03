@@ -1,0 +1,6 @@
+---
+# file: playbook.yml
+- import_playbook: www.yml
+- import_playbook: pgdb.yml
+#- import_playbook: elk.yml
+#- import_playbook: mgmt.yml

@@ -1,0 +1,16 @@
+---
+# file: roles/memcached/tasks/main.yml
+
+- name: Install memcached
+  yum: 
+    name: ['memcached', 'php-pecl-memcached'] 
+    state: installed 
+    enablerepo: remi,epel
+  notify:
+    - restart nginx
+    - restart php-fpm
+  tags: memcached
+
+- name: Run and enable memcached
+  service: name=memcached state=started enabled=yes
+  tags: memcached

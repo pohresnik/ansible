@@ -1,0 +1,22 @@
+---
+# file: roles/keepalived/tasks/main.yml
+
+- name: Install keepalived
+  yum: name=keepalived state=present
+
+- name: Copy keepalived master config
+  when: "'www1' in inventory_hostname"
+  template: 
+    src: 'keepalived.conf-master.j2'
+    dest: '/etc/keepalived/keepalived.conf'
+  notify: restart keepalived
+
+- name: Copy keepalived slave config
+  when: "'www2' in inventory_hostname"
+  template: 
+    src: 'keepalived.conf-slave.j2'
+    dest: '/etc/keepalived/keepalived.conf'
+  notify: restart keepalived
+
+- name: Run an enable keepalived
+  service: name=keepalived state=started enabled=yes

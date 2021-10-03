@@ -1,0 +1,35 @@
+---
+# file: roles/common/tasks/main.yml
+
+- name: Install ntpd
+  yum: name=ntp state=installed
+  tags: ntp
+
+- name: Configure ntpd
+  template: src=ntp.conf.j2 dest=/etc/ntp.conf
+  notify:
+    - restart ntpd
+  tags: ntp
+
+- name: Run and enable ntpd
+  service: name=ntpd state=started enabled=yes
+  tags: ntp
+
+- name: Install remi and epel repo from remote
+  yum:
+    name:
+      - "https://rpms.remirepo.net/enterprise/remi-release-7.rpm"
+      - "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+  become: true 
+  tags: remi
+
+- name: Get remi key
+  get_url: 
+    url: "http://rpms.remirepo.net/RPM-GPG-KEY-remi"
+    dest: /etc/pki/rpm-gpg/RPM-GPG-KEY-remi
+  become: true 
+  tags: remi
+
+- name: Disable SELinux
+  selinux:
+    state: disabled

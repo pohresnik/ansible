@@ -1,0 +1,89 @@
+---
+# file: roles/nginx/tasks/main.yml
+
+- name: Install nginx
+  yum: name=nginx state=present
+
+- name: Setup nginx config directory
+  file: path=/etc/nginx/{{ item }}
+        state=directory
+  with_items:
+    - sites-available
+    - sites-enabled
+    - snippets
+
+- name: Clean artifact path
+  file:
+    state: absent
+    path: "{{ item }}"
+  with_items:
+    - /etc/nginx/conf.d/
+    - /var/www/front.webcord.ru/public/
+
+- name: Create directories, if they don't exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: 0775
+  with_items:
+  - /var/log/nginx
+
+- name: Copy configs and certs
+  template: 
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+  loop:
+    - { 
+        src: 'nginx.conf.j2', 
+        dest: '/etc/nginx/nginx.conf' 
+      }
+    - { 
+        src: 'front.webcord.ru.j2', 
+        dest: '/etc/nginx/sites-available/front.webcord.ru.conf' 
+      }
+    - { 
+        src: 'front.webcord.ru.crt.j2', 
+        dest: '/etc/pki/tls/certs/front.webcord.ru.crt' 
+      }
+    - { 
+        src: 'front.webcord.ru.key.j2', 
+        dest: '/etc/pki/tls/certs/front.webcord.ru.key' 
+      }
+    - { 
+        src: 'ssl-params.conf.j2', 
+        dest: '/etc/nginx/snippets/ssl-params.conf' 
+      }
+  register: webapp
+  notify: restart nginx
+
+- name: Extract mwiki.tgz
+  ansible.builtin.unarchive:
+    src: mwiki.tgz
+    dest: /var/www/front.webcord.ru
+
+- name: Activate the webapp
+  when: webapp is defined
+  file: src=/etc/nginx/sites-available/front.webcord.ru.conf
+        dest=/etc/nginx/sites-enabled/front.webcord.ru.conf
+        state=link
+
+- name: Create info.php file
+  copy:
+    src: info.php
+    dest: /var/www/front.webcord.ru/public/info.php
+    owner: nginx
+    group: nginx
+    mode: u+rw,g-wx,o-wx
+
+- name: Copy MediaWiki config file
+  copy:
+    src: LocalSettings.php
+    dest: /var/www/front.webcord.ru/public/LocalSettings.php
+    owner: root
+    group: root
+    mode: u+rw,g-wx,o-wx
+
+- name: Run an enable nginx
+  service: name=nginx state=started enabled=yes

@@ -1,0 +1,15 @@
+[www]
+www1 ansible_ssh_host=10.0.16.21
+www2 ansible_ssh_host=10.0.16.22
+
+[pgdb]
+pg1 ansible_ssh_host=10.0.16.23
+pg2 ansible_ssh_host=10.0.16.24
+
+[mgmt]
+overseer ansible_ssh_host=10.0.16.25
+
+[elk]
+elk1 ansible_ssh_host=10.0.16.26
+elk2 ansible_ssh_host=10.0.16.27
+elk3 ansible_ssh_host=10.0.16.28

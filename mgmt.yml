@@ -1,0 +1,6 @@
+--- 
+# file: mgmt.yml
+- hosts: mgmt
+  roles:
+    - common
+    - iptables

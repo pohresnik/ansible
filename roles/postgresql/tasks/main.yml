@@ -1,0 +1,184 @@
+---
+# file: roles/postgresql/tasks/main.yml
+
+- name: Stop service postgresql-12, if started
+  ansible.builtin.service:
+    name: postgresql-12
+    state: stopped
+
+- name: Install dependencies for PostgreSQL
+  #when: "'pg1' in inventory_hostname"
+  yum: 
+    name: ['bash', 'openssl', 'llvm5.0-devel']
+    update_cache: true 
+    state: present # latest
+
+- name: Install PostgreSQL 
+  #when: "'pg1' in inventory_hostname"
+  yum: 
+    name: ['postgresql12-server', 'postgresql12', 'postgresql12-devel', 'python-psycopg2']
+    update_cache: true 
+    state: present
+
+- name: Clean artifact path
+  file:
+    state: absent
+    path: "{{ item }}"
+  with_items:
+    - /var/lib/pgsql/12/data/
+
+- name: "Initialize PostgreSQL"
+  when: "'pg1' in inventory_hostname"
+  shell: "/usr/pgsql-12/bin/postgresql-12-setup initdb"
+  #when: postgres_configs is defined
+  #ignore_errors: yes
+
+- name: Copy PostgreSQL configs
+  when: "'pg1' in inventory_hostname"
+  template: 
+    src: 'postgresql.conf.j2'
+    dest: '/var/lib/pgsql/12/data/postgresql.conf'
+    owner: postgres
+    group: postgres
+  #register: postgres_configs
+
+- name: Start service postgresql-12, if not started
+  when: "'pg1' in inventory_hostname"
+  ansible.builtin.service:
+    name: postgresql-12
+    state: started
+
+- name: Create repluser
+  when: "'pg1' in inventory_hostname"
+  postgresql_user:
+    name: "repluser"
+    password: "mySuperSecret_w0rd"
+    expires: infinity
+    role_attr_flags: REPLICATION
+  become: yes
+  become_user: postgres  
+
+- name: Create mwiki database
+  when: "'pg1' in inventory_hostname"
+  postgresql_db:
+    state: present
+    name: "mwiki"
+  become: yes
+  become_user: postgres
+  
+- name: Create db user (mwiki)
+  when: "'pg1' in inventory_hostname"
+  postgresql_user:
+    state: present
+    name: "mwiki"
+    password: "Test123Test123"
+  become: yes
+  become_user: postgres
+
+- name: "Grant mwiki user access to mwiki db"
+  when: "'pg1' in inventory_hostname"
+  postgresql_privs:
+    type: database
+    database: "mwiki"
+    roles: "mwiki"
+    grant_option: no
+    privs: all
+  become: yes
+  become_user: postgres
+
+- name: Change password postgres
+  when: "'pg1' in inventory_hostname"
+  postgresql_user:
+    user: "postgres"
+    password: "mySuperSecret_w0rd"
+    expires: infinity
+  become: yes
+  become_method: sudo
+  become_user: postgres 
+
+- name: Copy PostgreSQL HBA configs
+  when: "'pg1' in inventory_hostname"
+  template: 
+    src: 'pg_hba.conf.j2'
+    dest: '/var/lib/pgsql/12/data/pg_hba.conf'
+    owner: postgres
+    group: postgres
+  #register: postgres_configs
+  notify: reload postgresql-12
+
+- name: Copy backup file
+  when: "'pg1' in inventory_hostname"
+  copy:
+    src: mwiki.tar
+    dest: /var/lib/pgsql/12/backups/mwiki.tar
+    owner: postgres
+    group: postgres
+    mode: u+rw,g-wx,o-wx
+    # pg_restore -d mwiki /var/lib/pgsql/12/backups/mwiki.tar
+
+- name: "Restore the database"
+  when: "'pg1' in inventory_hostname"
+  postgresql_db:
+    state: restore
+    name: "mwiki"
+    target: "/var/lib/pgsql/12/backups/mwiki.tar"
+  become: yes
+  become_user: postgres
+
+- name: pgpass for non interactive logins to the other node
+  blockinfile:
+    path: /var/lib/pgsql/.pgpass
+    #path: /root/.pgpass
+    create: yes
+    #owner: postgres
+    #group: postgres
+    mode: 0600
+    block: |
+      # hostname:port:database:username:password
+      {% for host in groups['pgdb'] %}
+      {{ hostvars[host]['ansible_ssh_host'] + ':5432:*:repluser:mySuperSecret_w0rd' }}
+      {% endfor %}
+
+- name: Check if database is already initialized
+  when: "'pg2' in inventory_hostname"
+  stat:
+    path: '/var/lib/pgsql/12/data/PG_VERSION'
+  register: init_status
+
+- name: Setup data directory
+  when: "'pg2' in inventory_hostname"
+  file: 
+    path: "/var/lib/pgsql/12/data" 
+    state: directory
+    recurse: yes
+    owner: postgres
+    group: postgres
+    mode: u+rwx,g-rwx,o-rwx
+
+- name: "Initialize stream backup"
+  when: "'pg2' in inventory_hostname"
+  #shell: "pg_basebackup -D /var/lib/pgsql/12/data -h 10.0.16.23 -X stream -c fast -U repluser -w -R" 
+  #command: "su - postgres -c 'pg_basebackup --host=192.168.1.10 --username=repluser --pgdata=/var/lib/pgsql/12/data --wal-method=stream --write-recovery-conf'"
+  #shell: "export PG_REPL_PASSWD='mySuperSecret_w0rd' && pg_basebackup --host=10.0.16.23 --username=repluser --pgdata=/var/lib/pgsql/12/data --wal-method=stream --write-recovery-conf" 
+  shell: "pg_basebackup --host=10.0.16.23 --port=5432 --username=repluser --pgdata=/var/lib/pgsql/12/data/ --wal-method=stream --write-recovery-conf --no-password"
+  #command: pg_basebackup -X stream -D /var/lib/pgsql/12/data -h 10.0.16.23 -U repluser
+  #become: yes
+  become_user: postgres
+  #become_method: su
+  #when: postgres_configs is defined
+  #ignore_errors: yes
+
+- name: Start service postgresql-12, if not started
+  when: "'pg2' in inventory_hostname"
+  ansible.builtin.service:
+    name: postgresql-12
+    state: started
+
+- name: Wait for postgres to listen on port 5432
+  when: "'pg2' in inventory_hostname"
+  wait_for:
+    port: 5432
+    delay: 2
+
+- name: Ensure the PostgreSQL service is running
+  service: name=postgresql-12 state=started enabled=yes

@@ -1,0 +1,31 @@
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p icmp -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp -m state --state NEW -m tcp --dport 123 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp -m tcp --dport 80 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp -m tcp --dport 443 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp -m tcp --dport 3000 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp -m tcp --dport 9090 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp -m tcp --dport 9100 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p udp --dport 111 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p tcp --dport 111 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p tcp --dport 2049 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p tcp --dport 32769 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p udp --dport 32769 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p tcp --dport 892 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p udp --dport 892 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p tcp --dport 875 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p udp --dport 875 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p tcp --dport 662 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p udp --dport 662 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p tcp --dport 20048 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -m state --state NEW -p udp --dport 780 -j ACCEPT
+-A INPUT -s 10.0.0.0/8 -p tcp --match multiport --dports 45000:50000 -j ACCEPT
+-A INPUT -j REJECT --reject-with icmp-host-prohibited
+-A FORWARD -j REJECT --reject-with icmp-host-prohibited
+COMMIT

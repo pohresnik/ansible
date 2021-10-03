@@ -1,0 +1,49 @@
+---
+# file: roles/iptables/tasks/main.yml
+
+- name: Install iptables
+  yum: name=iptables-services state=installed
+  tags: iptables
+
+- name: be sure firewalld is disabled
+  service: >
+    name=firewalld
+    enabled=no
+    state=stopped
+  ignore_errors: yes
+  tags:
+    - firewall
+
+- name: Configure iptables for www
+  when: "'www' in group_names"
+  template: >
+    src="iptables-www.j2" 
+    dest=/etc/sysconfig/iptables
+    owner=root
+    group=root
+    mode=0600
+  notify:
+    - restart iptables
+  tags: iptables
+
+- name: Configure iptables for management
+  when: "'mgmt' in group_names"
+  template: >
+    src="iptables-mgmt.j2" 
+    dest=/etc/sysconfig/iptables
+    owner=root
+    group=root
+    mode=0600
+  notify:
+    - restart iptables
+  tags: iptables
+
+- name: Run and enable iptables
+  when: "'www' in group_names"
+  service: name=iptables state=started enabled=yes
+  tags: iptables
+
+- name: Run and enable iptables
+  when: "'www' not in group_names"
+  service: name=iptables state=stopped enabled=no
+  tags: iptables

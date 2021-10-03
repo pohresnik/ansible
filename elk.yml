@@ -1,0 +1,5 @@
+--- 
+# file: elk.yml
+- hosts: elk
+  roles:
+    - common
